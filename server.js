@@ -1,22 +1,22 @@
-const http = require('http');
-const Koa = require('koa');
-const Router = require('koa-router');
+const http = require("http");
+const Koa = require("koa");
+const Router = require("koa-router");
 //const { streamEvents } = require('http-event-stream');
-const koaBody = require('koa-body');
-const uuid = require('uuid');
-const WS = require('ws');
+const koaBody = require("koa-body");
+const uuid = require("uuid");
+const WS = require("ws");
 
 const app = new Koa();
 // CORS
 app.use(async (ctx, next) => {
-  const origin = ctx.request.get('Origin');
+  const origin = ctx.request.get("Origin");
   if (!origin) {
     return await next();
   }
 
-  const headers = { 'Access-Control-Allow-Origin': '*', };
+  const headers = { "Access-Control-Allow-Origin": "*" };
 
-  if (ctx.request.method !== 'OPTIONS') {
+  if (ctx.request.method !== "OPTIONS") {
     ctx.response.set({ ...headers });
     try {
       return await next();
@@ -26,85 +26,86 @@ app.use(async (ctx, next) => {
     }
   }
 
-  if (ctx.request.get('Access-Control-Request-Method')) {
+  if (ctx.request.get("Access-Control-Request-Method")) {
     ctx.response.set({
       ...headers,
-      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, PATCH',
+      "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, PATCH"
     });
 
-    if (ctx.request.get('Access-Control-Request-Headers')) {
-      ctx.response.set('Access-Control-Allow-Headers', ctx.request.get('Access-Control-Request-Headers'));
+    if (ctx.request.get("Access-Control-Request-Headers")) {
+      ctx.response.set(
+        "Access-Control-Allow-Headers",
+        ctx.request.get("Access-Control-Request-Headers")
+      );
     }
 
     ctx.response.status = 204;
   }
 });
 
-app.use(koaBody({
-  text: true,
-  urlencoded: true,
-  multipart: true,
-  json: true,
-}));
+app.use(
+  koaBody({
+    text: true,
+    urlencoded: true,
+    multipart: true,
+    json: true
+  })
+);
 
 const router = new Router();
-const server = http.createServer(app.callback())
+const server = http.createServer(app.callback());
 const wsServer = new WS.Server({ server });
 
 const clients = [];
 
-router.get('/index', async (ctx, next) => {
-  console.log('get index');
-  // ctx.response.body = 'hello';
+router.get("/index", async (ctx, next) => {
+  console.log("get index");
 });
 
-router.get('/users', async (ctx, next) => {
-  console.log('get index');
+router.get("/users", async (ctx, next) => {
+  console.log("get index");
   ctx.response.body = clients;
 });
 
-router.post('/users', async (ctx, next) => {
-  // create new contact
-  clients.push({...ctx.request.body, id: uuid.v4()});
-  ctx.response.status = 204
+router.post("/users", async (ctx, next) => {
+  clients.push({ ...ctx.request.body, id: uuid.v4() });
+  ctx.response.status = 204;
 });
 
-router.delete('/users/:name', async (ctx, next) => {
-  // remove contact by id (ctx.params.id)
+router.delete("/users/:name", async (ctx, next) => {
   console.log(ctx.params.name);
   const index = clients.findIndex(({ name }) => name === ctx.params.name);
   if (index !== -1) {
     clients.splice(index, 1);
-  };
-  ctx.response.status = 204
+  }
+  ctx.response.status = 204;
 });
 
-wsServer.on('connection', (ws, req) => {
-  console.log('connection');
-  ws.on('message', msg => {
-    console.log('msg');
+wsServer.on("connection", (ws, req) => {
+  console.log("connection");
+  ws.on("message", msg => {
+    console.log("msg");
     [...wsServer.clients]
-    .filter(o => {
-      return o.readyState === WS.OPEN;
-    })
-    .forEach(o => o.send(msg));
+      .filter(o => {
+        return o.readyState === WS.OPEN;
+      })
+      .forEach(o => o.send(msg));
   });
-  ws.on('close', msg => {
-    console.log('close');
+  ws.on("close", msg => {
+    console.log("close");
     [...wsServer.clients]
-    .filter(o => {
-      return o.readyState === WS.OPEN;
-    })
-    .forEach(o => o.send(JSON.stringify({type: 'del user'})));
+      .filter(o => {
+        return o.readyState === WS.OPEN;
+      })
+      .forEach(o => o.send(JSON.stringify({ type: "del user" })));
     ws.close();
   });
-  // new users
+
   [...wsServer.clients]
     .filter(o => {
       return o.readyState === WS.OPEN;
     })
-    .forEach(o => o.send(JSON.stringify({type: 'add user'})));
-//  ws.send('welcome');
+    .forEach(o => o.send(JSON.stringify({ type: "add user" })));
 });
 
 app.use(router.routes()).use(router.allowedMethods());
